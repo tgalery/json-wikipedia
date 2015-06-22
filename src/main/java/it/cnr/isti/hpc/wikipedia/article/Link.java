@@ -39,7 +39,6 @@ public class Link {
 		super();
 		this.id = id;
 		setDescription(description);
-		this.description = description;
 		this.start = start;
 		this.end = end;
 	}
@@ -60,6 +59,7 @@ public class Link {
 	
 	
 	public void setDescription(String description) {
+<<<<<<< HEAD
         // Some links do not have any anchor
         // For those cases the anchor is the same wikipedia Id
 		if (description.isEmpty()){
@@ -67,6 +67,16 @@ public class Link {
         }else{
             this.description = description;
         }
+=======
+	    // Some links do not have any anchor
+	    // For those cases the anchor is the same wikipedia Id
+	    if (description==""){
+	        this.description = this.id.replace("_", " ");
+	    }
+	    else{
+	        this.description = description;
+	    }
+>>>>>>> Removing Tags from Paragraphs
 	}
 
 	/**  
