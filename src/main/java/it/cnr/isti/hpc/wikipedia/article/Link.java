@@ -38,14 +38,9 @@ public class Link {
 	public Link(String id, String anchor, int start, int end) {
 		super();
 		this.id = id;
-<<<<<<< HEAD
-		setDescription(description);
-		this.description = description;
-=======
-		this.anchor = anchor;
->>>>>>> adding paragraphs with links
 		this.start = start;
 		this.end = end;
+        setAnchor(anchor);
 	}
 	
 	public String getId() {
@@ -75,16 +70,17 @@ public class Link {
 	}
 	
 	public String getAnchor() {
-		// When anchor is empty, it means is the same of id
-		if (anchor != null && !anchor.isEmpty())
-			return anchor;
-		else
-			return id;
+		return this.anchor;
 	}
 	
 	
 	public void setAnchor(String anchor) {
-		this.anchor = anchor;
+        // Some links do not have any anchor
+        // For those cases the anchor is the same wikipedia Id
+        if (anchor=="")
+           this.anchor = this.id.replace("_", " ");
+        else
+           this.anchor = anchor;
 	}
 
 	/**  
