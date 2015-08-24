@@ -11,15 +11,12 @@ compile the project running
 
     mvn assembly:assembly 
 	
-the command will produce a JAR file containing all the dependencies the target folder.  
+the command will produce a JAR file containing all the dependencies in the target folder.  
 
 #### Convert the Wikipedia XML to JSON ####
 
     java -cp target/json-wikipedia-1.0.0-jar-with-dependencies.jar it.cnr.isti.hpc.wikipedia.cli.MediawikiToJsonCLI -input wikipedia-dump.xml.bz -output wikipedia-dump.json[.gz] -lang [en|it] 		
 
-or 
-
-	./scripts/convert-xml-dump-to-json.sh [en|it] wikipedia-dump.xml.bz wikipedia-dump.json[.gz]
 
 produces in `wikipedia-dump.json` the JSON version of the dump. Each line of the file contains an article 
 of dump encoded in JSON. Each JSON line can be deserialized in an **Article** object, 
@@ -51,14 +48,7 @@ In order to use these classes, you will have to install `json-wikipedia` in your
 
     mvn install
 
-and import the project in your new maven project adding the dependency: 
 
-    <dependency>
-	    <groupId>it.cnr.isti.hpc</groupId>
-		<artifactId>json-wikipedia</artifactId>
-		<version>1.0.0</version>
-	</dependency> 
-	
 #### Schema ####
 
 ```
@@ -89,9 +79,5 @@ and import the project in your new maven project adding the dependency:
  |-- wikiTitle: string (nullable = true)
 ```
 
-
-
-
-[json]: http://www.json.org/fatfree.html "JSON: The Fat-Free Alternative to XML"
-
-
+#### Usage ####
+This repo is being used for building the Wikipedia stats to be used for creating DBPedia spotlight models.
