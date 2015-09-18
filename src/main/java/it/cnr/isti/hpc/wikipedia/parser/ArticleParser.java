@@ -15,30 +15,23 @@
  */
 package it.cnr.isti.hpc.wikipedia.parser;
 
-import it.cnr.isti.hpc.wikipedia.article.Article;
+import de.tudarmstadt.ukp.wikipedia.parser.*;
+import it.cnr.isti.hpc.wikipedia.article.*;
 import it.cnr.isti.hpc.wikipedia.article.Article.Type;
-import it.cnr.isti.hpc.wikipedia.article.Language;
-import it.cnr.isti.hpc.wikipedia.article.Link;
-import it.cnr.isti.hpc.wikipedia.article.Table;
-import it.cnr.isti.hpc.wikipedia.article.Template;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
+import it.cnr.isti.hpc.wikipedia.article.Link;
+import it.cnr.isti.hpc.wikipedia.article.Table;
+import it.cnr.isti.hpc.wikipedia.article.Template;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import de.tudarmstadt.ukp.wikipedia.parser.Content;
-import de.tudarmstadt.ukp.wikipedia.parser.ContentElement;
-import de.tudarmstadt.ukp.wikipedia.parser.DefinitionList;
-import de.tudarmstadt.ukp.wikipedia.parser.NestedList;
-import de.tudarmstadt.ukp.wikipedia.parser.NestedListContainer;
-import de.tudarmstadt.ukp.wikipedia.parser.Paragraph;
-import de.tudarmstadt.ukp.wikipedia.parser.ParsedPage;
-import de.tudarmstadt.ukp.wikipedia.parser.Section;
-import de.tudarmstadt.ukp.wikipedia.parser.Span;
 import de.tudarmstadt.ukp.wikipedia.parser.mediawiki.MediaWikiParser;
 
 /**
@@ -83,10 +76,15 @@ public class ArticleParser {
 	}
 
 	public void parse(Article article, String mediawiki) {
-		ParsedPage page = parser.parse(mediawiki);
-		setRedirect(article, mediawiki);
+        if (mediawiki == null) {
+            logger.warn("Text is null for article {}", article.getTitle());
+        } else {
+            String cleanedMediawiki = removeTemplates(mediawiki);
+            ParsedPage page = parser.parse(cleanedMediawiki);
+            setRedirect(article, cleanedMediawiki);
 
-		parse(article, page);
+            parse(article, page);
+        }
 
 	}
 
@@ -133,13 +131,12 @@ public class ArticleParser {
 	//
 	// }
 
-	// private final static String templatePattern = "TEMPLATE\\[[^]]+\\]";
-	//
-	// private static String removeTemplates(String paragraph) {
-	// paragraph = paragraph.replaceAll(templatePattern, " ");
-	//
-	// return paragraph;
-	// }
+	 private final static String templatePattern = "TEMPLATE\\[[^]]+\\]";
+
+	 private static String removeTemplates(String paragraph) {
+	 return paragraph.replaceAll(templatePattern, " ");
+
+	 }
 
 	/**
 	 * @param article
@@ -322,23 +319,31 @@ public class ArticleParser {
 
 	}
 
-	private void setLinks(Article article, ParsedPage page) {
+    private Pair<List<Link>, List<Link>> extractLinks(List<de.tudarmstadt.ukp.wikipedia.parser.Link> links){
 
-		List<Link> links = new ArrayList<Link>(10);
-		List<Link> elinks = new ArrayList<Link>(10);
+		List<Link> internalLinks = new ArrayList<Link>(10);
+		List<Link> externalLinks = new ArrayList<Link>(10);
 
-		for (de.tudarmstadt.ukp.wikipedia.parser.Link t : page.getLinks()) {
+		for (de.tudarmstadt.ukp.wikipedia.parser.Link t : links) {
 			if (t.getType() == de.tudarmstadt.ukp.wikipedia.parser.Link.type.INTERNAL) {
-
-				links.add(new Link(t.getTarget(), t.getText()));
-
+				if(!t.getTarget().equals(""))
+					internalLinks.add(new Link(t.getTarget(), t.getText(), t.getPos().getStart(), t.getPos().getEnd()));
 			}
 			if (t.getType() == de.tudarmstadt.ukp.wikipedia.parser.Link.type.EXTERNAL) {
-
-				elinks.add(new Link(t.getTarget(), t.getText()));
-
+				externalLinks.add(new Link(t.getTarget(), t.getText(),t.getPos().getStart(), t.getPos().getEnd()));
 			}
 		}
+
+		return Pair.of(internalLinks, externalLinks);
+    }
+
+
+	private void setLinks(Article article, ParsedPage page) {
+		Pair<List<Link>,List<Link>> extractedLinks = extractLinks(page.getLinks());
+
+		List<Link> links = extractedLinks.getLeft();
+		List<Link> elinks = extractedLinks.getRight();
+
 		article.setLinks(links);
 		article.setExternalLinks(elinks);
 	}
@@ -389,7 +394,7 @@ public class ArticleParser {
 
 		for (de.tudarmstadt.ukp.wikipedia.parser.Link c : page.getCategories()) {
 
-			categories.add(new Link(c.getTarget(), c.getText()));
+			categories.add(new Link(c.getTarget(), c.getText(), c.getPos().getStart(), c.getPos().getEnd()));
 		}
 		article.setCategories(categories);
 
@@ -411,16 +416,79 @@ public class ArticleParser {
 
 	}
 
+	/*
+	* Extracts text and links from tables and returns a list of paragraphs
+	* */
+	private List<Paragraph> getParagraphsInTables(ParsedPage page){
+		List<Paragraph> paragraphsInTables = new ArrayList<Paragraph>();
+		for(de.tudarmstadt.ukp.wikipedia.parser.Table t: page.getTables()){
+			for(Paragraph p: t.getParagraphs()){
+				paragraphsInTables.add(p);
+			}
+		}
+		return paragraphsInTables;
+	}
+
+	/*
+	* Extracts text and links from Lists and returns a list of paragraphs
+	* */
+	private List<Paragraph> getParagraphsInList(ParsedPage page){
+		List<Paragraph> paragraphsInLists = new ArrayList<Paragraph>();
+		for (DefinitionList dl : page.getDefinitionLists()) {
+			for (ContentElement c : dl.getDefinitions()) {
+				Paragraph p = new Paragraph(Paragraph.type.NORMAL);
+				p.setText(c.getText());
+				p.setLinks(c.getLinks());
+				paragraphsInLists.add(p);
+			}
+		}
+
+
+		for (NestedListContainer dl : page.getNestedLists()) {
+			List<String> l = new ArrayList<String>();
+			for (NestedList nl : dl.getNestedLists()){
+				Paragraph p = new Paragraph(Paragraph.type.NORMAL);
+				p.setText(nl.getText());
+				p.setLinks(nl.getLinks());
+				paragraphsInLists.add(p);
+			}
+
+		}
+		return paragraphsInLists;
+	}
+
 	private void setParagraphs(Article article, ParsedPage page) {
 		List<String> paragraphs = new ArrayList<String>(page.nrOfParagraphs());
-		for (Paragraph p : page.getParagraphs()) {
+
+		List<ParagraphWithLinks> paraLinks = new ArrayList<ParagraphWithLinks>();
+
+		List<Paragraph> AllParagraphs =  new ArrayList<Paragraph>();
+		// Paragraphs extracted from page
+		AllParagraphs.addAll(page.getParagraphs());
+		// Converting table's text into paragraphs
+		AllParagraphs.addAll(getParagraphsInTables(page));
+		// Converting list's text into paragarphs
+		AllParagraphs.addAll(getParagraphsInList(page));
+
+
+		for (Paragraph p : AllParagraphs) {
 			String text = p.getText();
-			// text = removeTemplates(text);
-			text = text.replace("\n", " ").trim();
-			if (!text.isEmpty())
+			List<Link> links = new ArrayList<Link>();
+
+			text = text.replace("\n", " ");//.trim();
+			if (!text.isEmpty()){
 				paragraphs.add(text);
+
+				Pair<List<Link>,List<Link>> extractedLinks = extractLinks(p.getLinks());
+				// internal links
+				links = extractedLinks.getLeft();
+
+				ParagraphWithLinks paragraphWithLinks = new ParagraphWithLinks(text, links);
+				paraLinks.add(paragraphWithLinks);
+			}
 		}
 		article.setParagraphs(paragraphs);
+		article.setParagraphsWithLinks(paraLinks);
 	}
 
 	private void setLists(Article article, ParsedPage page) {

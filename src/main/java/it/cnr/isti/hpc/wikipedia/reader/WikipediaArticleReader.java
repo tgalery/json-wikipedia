@@ -19,10 +19,9 @@ package it.cnr.isti.hpc.wikipedia.reader;
 import info.bliki.wiki.dump.IArticleFilter;
 import info.bliki.wiki.dump.Siteinfo;
 import info.bliki.wiki.dump.WikiArticle;
+
 import info.bliki.wiki.dump.WikiXMLParser;
-import it.cnr.isti.hpc.benchmark.Stopwatch;
 import it.cnr.isti.hpc.io.IOUtils;
-import it.cnr.isti.hpc.log.ProgressLogger;
 import it.cnr.isti.hpc.wikipedia.article.Article;
 import it.cnr.isti.hpc.wikipedia.article.Article.Type;
 import it.cnr.isti.hpc.wikipedia.parser.ArticleParser;
@@ -30,6 +29,8 @@ import it.cnr.isti.hpc.wikipedia.parser.ArticleParser;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+
+import it.cnr.isti.hpc.wikipedia.spark.StreamWikiXmlParser;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,13 +54,13 @@ public class WikipediaArticleReader {
 
 	private WikiXMLParser wxp;
 	private BufferedWriter out;
+	private String json;
 
 	private ArticleParser parser;
 	// private JsonRecordParser<Article> encoder;
 
-	private static ProgressLogger pl = new ProgressLogger("parsed {} articles",
-			10000);
-	private static Stopwatch sw = new Stopwatch();
+	private boolean toJsonFile = true;
+
 
 	/**
 	 * Generates a converter from the xml to json dump.
@@ -97,11 +98,12 @@ public class WikipediaArticleReader {
 	 * 
 	 */
 	public WikipediaArticleReader(File inputFile, File outputFile, String lang) {
+		toJsonFile = true;
 		JsonConverter handler = new JsonConverter();
 		// encoder = new JsonRecordParser<Article>(Article.class);
 		parser = new ArticleParser(lang);
 		try {
-			wxp = new WikiXMLParser(inputFile.getAbsolutePath(), handler);
+			wxp = new WikiXMLParser(new File(inputFile.getAbsolutePath()), handler);
 		} catch (Exception e) {
 			logger.error("creating the parser {}", e.toString());
 			System.exit(-1);
@@ -112,20 +114,32 @@ public class WikipediaArticleReader {
 
 	}
 
+	public WikipediaArticleReader(String XMLInput, String lang) {
+		toJsonFile = false;
+		JsonConverter handler = new JsonConverter();
+
+		parser = new ArticleParser(lang);
+		try {
+			wxp = new StreamWikiXmlParser(XMLInput, handler);
+		} catch (Exception e) {
+			logger.error("creating the parser {}", e.toString());
+			System.exit(-1);
+		}
+
+	}
+
 	/**
 	 * Starts the parsing
 	 */
 	public void start() throws IOException, SAXException {
 
 		wxp.parse();
-		out.close();
-		logger.info(sw.stat("articles"));
+		if (toJsonFile)
+			out.close();
 	}
 
 	private class JsonConverter implements IArticleFilter {
 		public void process(WikiArticle page, Siteinfo si) {
-			pl.up();
-			sw.start("articles");
 			String title = page.getTitle();
 			String id = page.getId();
 			String namespace = page.getNamespace();
@@ -137,21 +151,15 @@ public class WikipediaArticleReader {
 				type = Type.CATEGORY;
 			if (page.isTemplate()) {
 				type = Type.TEMPLATE;
-				// FIXME just to go fast;
-				sw.stop("articles");
 				return;
 			}
 
 			if (page.isProject()) {
 				type = Type.PROJECT;
-				// FIXME just to go fast;
-				sw.stop("articles");
 				return;
 			}
 			if (page.isFile()) {
 				type = Type.FILE;
-				// FIXME just to go fast;
-				sw.stop("articles");
 				return;
 			}
 			if (page.isMain())
@@ -167,16 +175,26 @@ public class WikipediaArticleReader {
 			parser.parse(article, page.getText());
 
 			try {
-				out.write(article.toJson());
-				out.write("\n");
+				if(toJsonFile){
+					out.write(article.toJson());
+					out.write("\n");
+				}else{
+					setJson(article.toJson());
+				}
 			} catch (IOException e) {
 				logger.error("writing the output file {}", e.toString());
 				System.exit(-1);
 			}
 
-			sw.stop("articles");
-
 			return;
 		}
+	}
+
+	public String getJson() {
+		return json;
+	}
+
+	public void setJson(String json) {
+		this.json = json;
 	}
 }

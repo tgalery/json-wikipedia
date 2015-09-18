@@ -53,18 +53,19 @@ public class Article {
 	private String timestamp;
 	private Type type = Type.ARTICLE;
 	private String enWikiTitle;
-	private List<Table> tables;
-	private List<Link> images;
+	private transient List<Table> tables;
+	private transient List<Link> images;
 	protected List<List<String>> lists;
 	private List<Link> links;
 	private List<Link> externalLinks;
 	protected String redirect;
-	private List<String> sections;
-	private List<String> paragraphs;
-	private List<Link> categories;
-	private List<Template> templates;
-	private List<String> templatesSchema;
-	private List<String> highlights;
+	private transient List<String> sections;
+	private transient List<String> paragraphs;
+	private List<ParagraphWithLinks> paragraphsWithLinks;
+	private transient List<Link> categories;
+	private transient List<Template> templates;
+	private transient List<String> templatesSchema;
+	private transient List<String> highlights;
 	private transient String summary;
 	private Template infobox;
 
@@ -79,9 +80,11 @@ public class Article {
 	}
 
 	public List<String> getParagraphs() {
-		if (paragraphs == null)
-			return Collections.emptyList();
-		return paragraphs;
+        ArrayList<String> allParagraphs = new ArrayList<String>();
+        for(ParagraphWithLinks paragraph : paragraphsWithLinks){
+            allParagraphs.add(paragraph.getParagraph());
+        }
+		return allParagraphs;
 	}
 
 	public List<String> getCleanParagraphs() {
@@ -689,6 +692,13 @@ public class Article {
 		}
 		return "NULL";
 
+	}
+	public List<ParagraphWithLinks> getParagraphsWithLinks() {
+		return paragraphsWithLinks;
+	}
+
+	public void setParagraphsWithLinks(List<ParagraphWithLinks> paragraphsWithLinks) {
+		this.paragraphsWithLinks = paragraphsWithLinks;
 	}
 
 }
